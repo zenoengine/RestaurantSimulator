@@ -22,4 +22,6 @@ public:
 	inline const size_t GetTimeToEat() const { return mTimeToEat; }
 	inline const CustomerType GetCustomerType() const { return mType; }
 	inline const void SetCustomerType(CustomerType type) { mType = type; }
+
+	void Eat();
 };

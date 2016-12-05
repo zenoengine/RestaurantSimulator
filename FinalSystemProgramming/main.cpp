@@ -6,7 +6,11 @@ using namespace std;
 
 void main()
 {
-	Simulator simulator;
-	simulator.Init();
-	return ;
+	Restaurant restuarant;
+
+	restuarant.PrepareOpen();
+	restuarant.Open();
+	restuarant.Close();
+
+	return;
 }
