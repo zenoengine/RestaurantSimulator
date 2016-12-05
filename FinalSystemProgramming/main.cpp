@@ -1,6 +1,6 @@
 #include <time.h>
 #include <iostream>
-#include "Simulator.h"
+#include "Restaurant.h"
 
 using namespace std;
 
