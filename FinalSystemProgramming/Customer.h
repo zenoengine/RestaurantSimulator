@@ -14,7 +14,7 @@ private:
 
 	size_t mTimeToEat = 0;
 	CustomerType mType = CT_NORMAL;
-
+	
 public:
 	Customer(CustomerType type);
 	~Customer() {};

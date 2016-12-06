@@ -111,13 +111,11 @@ shared_ptr<Customer> Restaurant::EnterCsutomer()
 {
 	shared_ptr<Customer> spCustomer = nullptr;
 
-	EnterCriticalSection(&mCriticalSecionDoor);
 	if (!mWaitingCustomers.empty())
 	{
 		spCustomer = mWaitingCustomers.front();
 		mWaitingCustomers.pop();
 	}
-	LeaveCriticalSection(&mCriticalSecionDoor);
 
 	return spCustomer;
 }
@@ -147,14 +145,27 @@ void Restaurant::ProvideFood(LPVOID arg)
 		size_t chairId = pChair->chairId;
 		pRestaurant->WaitForEmptyChair(chairId);
 
+		pRestaurant->EnterCriticalSecion();
 		shared_ptr<Customer> spCustomer = pRestaurant->EnterCsutomer();
-
 		if (spCustomer == nullptr)
 		{
 			return;
 		}
-
+		std::cout << "Entered " << std::endl;
+		std::cout << "timeToEat : " << spCustomer->GetTimeToEat() << std::endl;
+		pRestaurant->LeaveCriticalSecion();
+		
 		spCustomer->Eat();
 		pRestaurant->MakeEmptyChair(chairId);
 	}
+}
+
+void Restaurant::EnterCriticalSecion()
+{
+	EnterCriticalSection(&mCriticalSecionDoor);
+}
+
+void Restaurant::LeaveCriticalSecion()
+{
+	LeaveCriticalSection(&mCriticalSecionDoor);
 }

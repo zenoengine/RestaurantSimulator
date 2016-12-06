@@ -46,4 +46,7 @@ private:
 	vector<HANDLE> mThreadHandles;
 
 	static void ProvideFood(LPVOID arg);
+	
+	void EnterCriticalSecion();
+	void LeaveCriticalSecion();
 };

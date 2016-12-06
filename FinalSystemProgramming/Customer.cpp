@@ -11,8 +11,5 @@ Customer::Customer(CustomerType type)
 
 void Customer::Eat()
 {
-	std::cout << "Entered " << std::endl;
-	std::cout << "timeToEat : " << mTimeToEat << std::endl;
-
-	Sleep(mTimeToEat);
+	Sleep((DWORD)mTimeToEat);
 }
