@@ -15,6 +15,9 @@ private:
 	size_t mTimeToEat = 0;
 	CustomerType mType = CT_NORMAL;
 	
+	static size_t customerIdGenerator;
+	size_t mCustomerId = 0;
+
 public:
 	Customer(CustomerType type);
 	~Customer() {};
@@ -24,4 +27,6 @@ public:
 	inline const void SetCustomerType(CustomerType type) { mType = type; }
 
 	void Eat();
+	bool IsFinish();
+	size_t GetId();
 };

@@ -2,9 +2,13 @@
 #include <map>
 #include <iostream>
 #include <assert.h>
+#include <string>
+
+#include "Util.h"
 
 Restaurant::Restaurant()
 {
+	mClock = 690;
 }
 
 Restaurant::~Restaurant()
@@ -19,7 +23,6 @@ void Restaurant::PrepareOpen()
 
 	const int avergaeError = rand() % 10 - 5;
 	int todayCustomerCount = AVERAGE_CUSTOMER + avergaeError;
-
 	//make reservation index;
 	vector<size_t> reservationTickets;
 	const int reservationCutomerCount = 5;
@@ -52,7 +55,6 @@ void Restaurant::PrepareOpen()
 			}
 		}
 
-
 		mWaitingCustomers.push(customer);
 	}
 
@@ -61,16 +63,18 @@ void Restaurant::PrepareOpen()
 		Chair chair;
 		chair.chairId = idx;
 		chair.pRestaurant = this;
-		chair.state = CreateMutex(0, FALSE, 0);
+		chair.bCanUseState = true;
 		mChairs.push_back(chair);
 	}
 
-	for (size_t idx = 0; idx < MAX_CHAIR_COUNT; idx++)
+	for (size_t idx = 0; idx < MAX_STAFF_COUNT; idx++)
 	{
-		auto a = mChairs[idx];
-		HANDLE handle = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)ProvideFood, (LPVOID)&mChairs[idx], CREATE_SUSPENDED, 0);
+		HANDLE handle = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)StaffWorkProcess, this, CREATE_SUSPENDED, 0);
 		mThreadHandles.push_back(handle);
 	}
+
+	LARGE_INTEGER liDueTime;
+	liDueTime.QuadPart = 0;
 
 }
 
@@ -81,19 +85,60 @@ void Restaurant::Open()
 		ResumeThread(mThreadHandles[idx]);
 	}
 
+	while (true)
+	{
+		if (mWaitingCustomers.size() == 0 && mEattingCustomers.size() == 0)
+		{
+			break;
+		}
+
+		Sleep(1);
+
+		list<pair<shared_ptr<Customer>, int>> finishedList;
+		for (auto customerInfo : mEattingCustomers)
+		{
+			auto customer = customerInfo.first;
+
+			if (customer->IsFinish())
+			{
+
+				finishedList.push_back(customerInfo);
+				continue;
+			}
+
+			customer->Eat();
+		}
+
+		for (auto customerInfo : finishedList)
+		{
+			size_t charId = customerInfo.second;
+			MakeEmptyChair(charId);
+			mEattingCustomers.remove(customerInfo);
+
+			string leaveLog = "Leave ";
+			leaveLog += "customerId :" + to_string(customerInfo.first->GetId());
+			WriteLog(leaveLog.c_str());
+		}
+
+		if (mClock % 30 == 0)
+		{
+			size_t count = CheckEmptyChairCount();
+			string checkEmptyChairLog = "empty Char Count : " + to_string(count);
+			WriteLog(checkEmptyChairLog.c_str());
+		}
+
+		mClock++;
+	}
+
 	WaitForMultipleObjects((DWORD)mThreadHandles.size(), &mThreadHandles[0], TRUE, INFINITE);
 }
 
 void Restaurant::Close()
 {
+
 	for (auto handle : mThreadHandles)
 	{
 		CloseHandle(handle);
-	}
-
-	for (auto chair : mChairs)
-	{
-		CloseHandle(chair.state);
 	}
 
 	while (!mWaitingCustomers.empty())
@@ -105,6 +150,7 @@ void Restaurant::Close()
 	mChairs.clear();
 
 	DeleteCriticalSection(&mCriticalSecionDoor);
+
 }
 
 shared_ptr<Customer> Restaurant::EnterCsutomer()
@@ -115,57 +161,126 @@ shared_ptr<Customer> Restaurant::EnterCsutomer()
 	{
 		spCustomer = mWaitingCustomers.front();
 		mWaitingCustomers.pop();
+		string enterLog = "Enter Customer : ";
+		enterLog += to_string(spCustomer->GetId());
+		WriteLog(enterLog.c_str());
 	}
 
 	return spCustomer;
 }
 
-void Restaurant::WaitForEmptyChair(size_t chairId)
+Restaurant::Chair* Restaurant::FindEmptyChair()
 {
-	WaitForSingleObject(mChairs[chairId].state, INFINITE);
+	Chair* pChair = nullptr;
+
+	for (size_t index = 0; index < mChairs.size(); index++)
+	{
+		if (mChairs[index].bCanUseState)
+		{
+			pChair = &mChairs[index];
+			pChair->bCanUseState = false;
+			break;
+		}
+	}
+
+	return pChair;
+}
+
+void Restaurant::SitToChair(shared_ptr<Customer> spCustomer, size_t chairId)
+{
+	//	Lock();
+	string startEatLog = "Start Eat And Customer Id :" + to_string(spCustomer->GetId());
+	WriteLog(startEatLog.c_str());
+	//	mChairs[chairId].bCanUseState = false;
+	mEattingCustomers.push_back(make_pair(spCustomer, chairId));
+	//	Unlock();
 }
 
 void Restaurant::MakeEmptyChair(size_t chairId)
 {
-	ReleaseMutex(mChairs[chairId].state);
+	mChairs[chairId].bCanUseState = true;
 }
 
-void Restaurant::ProvideFood(LPVOID arg)
+void Restaurant::StaffWorkProcess(LPVOID arg)
 {
-	Chair* pChair = static_cast<Chair*>(arg);
-	Restaurant* pRestaurant = pChair->pRestaurant;
-	if (!pChair || !pRestaurant)
+	Restaurant* pRestaurant = static_cast<Restaurant*>(arg);
+	if (!pRestaurant)
 	{
 		assert(false);
 		return;
 	}
 
+	Chair* pChair = nullptr;
 	while (1)
 	{
-		size_t chairId = pChair->chairId;
-		pRestaurant->WaitForEmptyChair(chairId);
+		pRestaurant->Lock();
+		Chair* pChair = pRestaurant->FindEmptyChair();
 
-		pRestaurant->EnterCriticalSecion();
+		if (pChair == nullptr)
+		{
+			Sleep(1);
+			pRestaurant->Unlock();
+			continue;
+		}
+
+		Sleep(RandomRange(1, 10));
 		shared_ptr<Customer> spCustomer = pRestaurant->EnterCsutomer();
 		if (spCustomer == nullptr)
 		{
+			pRestaurant->Unlock();
 			return;
 		}
-		std::cout << "Entered " << std::endl;
-		std::cout << "timeToEat : " << spCustomer->GetTimeToEat() << std::endl;
-		pRestaurant->LeaveCriticalSecion();
-		
-		spCustomer->Eat();
-		pRestaurant->MakeEmptyChair(chairId);
+
+		if (spCustomer->GetCustomerType() == CT_RESERVATION)
+		{
+			SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+		}
+
+		pRestaurant->SitToChair(spCustomer, pChair->chairId);
+
+		if (spCustomer->GetCustomerType() == CT_RESERVATION)
+		{
+			SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
+		}
+		pRestaurant->Unlock();
 	}
 }
 
-void Restaurant::EnterCriticalSecion()
+size_t Restaurant::CheckEmptyChairCount()
+{
+	size_t emptyChairCount = 0;
+	for (auto chair : mChairs)
+	{
+		if (chair.bCanUseState)
+		{
+			emptyChairCount++;
+		}
+	}
+	return emptyChairCount;
+}
+
+void Restaurant::WriteLog(const char* szTitle)
+{
+	int hour = mClock / 60 % 24;
+	int min = mClock % 60;
+	string logText;
+	logText.append("[");
+	logText.append(szTitle);
+	logText.append("]");
+	logText.append(" TimeStamp (");
+	logText.append(to_string(hour));
+	logText.append("h :");
+	logText.append(to_string(min));
+	logText.append("m)");
+	mLogger.WriteLog(logText.c_str());
+}
+
+void Restaurant::Lock()
 {
 	EnterCriticalSection(&mCriticalSecionDoor);
 }
 
-void Restaurant::LeaveCriticalSecion()
+void Restaurant::Unlock()
 {
 	LeaveCriticalSection(&mCriticalSecionDoor);
 }
