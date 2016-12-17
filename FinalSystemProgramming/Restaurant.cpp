@@ -8,7 +8,6 @@
 
 Restaurant::Restaurant()
 {
-	mClock = 690;
 }
 
 Restaurant::~Restaurant()
@@ -178,7 +177,6 @@ Restaurant::Chair* Restaurant::FindEmptyChair()
 		if (mChairs[index].bCanUseState)
 		{
 			pChair = &mChairs[index];
-			pChair->bCanUseState = false;
 			break;
 		}
 	}
@@ -188,12 +186,10 @@ Restaurant::Chair* Restaurant::FindEmptyChair()
 
 void Restaurant::SitToChair(shared_ptr<Customer> spCustomer, size_t chairId)
 {
-	//	Lock();
 	string startEatLog = "Start Eat And Customer Id :" + to_string(spCustomer->GetId());
 	WriteLog(startEatLog.c_str());
-	//	mChairs[chairId].bCanUseState = false;
+ 	mChairs[chairId].bCanUseState = false;
 	mEattingCustomers.push_back(make_pair(spCustomer, chairId));
-	//	Unlock();
 }
 
 void Restaurant::MakeEmptyChair(size_t chairId)

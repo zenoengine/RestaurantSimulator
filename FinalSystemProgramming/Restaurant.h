@@ -62,5 +62,5 @@ private:
 
 	void WriteLog(const char* szTitle = "");
 
-	size_t mClock;
+	size_t mClock = 690;
 };
